@@ -1,0 +1,209 @@
+{
+  "name": "Webhook → Texto → Telegram",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "formulario-resposta",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "692eabd4-a08b-4fd2-878a-75557537d6c0",
+      "name": "Webhook (Formulário)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        944
+      ],
+      "webhookId": "formulario-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.query.nome}}",
+              "operation": "isNotEmpty"
+            },
+            {
+              "value1": "={{$json.query.email}}",
+              "operation": "isNotEmpty"
+            },
+            {
+              "value1": "={{$json.query.mensagem}}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "acaaa87d-dc29-45c6-bbce-ae1389cfbcd8",
+      "name": "Filtrar Dados Válidos",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1312,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'erro', mensagem: 'Campos obrigatórios ausentes: nome, email e mensagem são necessários.' }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "338ac9b2-f6fd-4408-b3c1-d31feef750ef",
+      "name": "Resposta de Erro",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "nome",
+              "value": "={{ $json.query.nome.trim() }}"
+            },
+            {
+              "name": "email",
+              "value": "={{ $json.query.email.toLowerCase().trim() }}"
+            },
+            {
+              "name": "mensagem",
+              "value": "={{ $json.query.mensagem.trim() }}"
+            },
+            {
+              "name": "data_envio",
+              "value": "={{ new Date().toLocaleString('pt-BR') }}"
+            },
+            {
+              "name": "status",
+              "value": "Recebido"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1ea05a53-3eb2-4974-a16e-8a5ed9554453",
+      "name": "Processar e Formatar Dados",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        1536,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "xandaodoespadao@gmail.com",
+        "toEmail": "ponde.matheus@gmail.com",
+        "subject": "=Nova resposta recebida do formulário\n\nNome: {{ $json[\"nome\"] }}\nEmail: {{ $json[\"email\"] }}\nMensagem: {{ $json[\"mensagem\"] }}\n\nEnviado automaticamente pelo n8n.",
+        "options": {}
+      },
+      "id": "a3573021-4b3e-443e-9fb4-93d4ca0eb6a7",
+      "name": "Enviar Relatório por E-mail",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        848
+      ],
+      "webhookId": "f7bd3335-a642-4361-89e4-1d5feb60f86d",
+      "credentials": {
+        "smtp": {
+          "id": "jlFtE72eMQNskbKa",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'sucesso', mensagem: 'Resposta recebida e registrada com sucesso!' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "39eb868c-2f22-474b-90aa-bc7efd18beae",
+      "name": "Resposta de Sucesso",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1936,
+        944
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook (Formulário)": {
+      "main": [
+        [
+          {
+            "node": "Filtrar Dados Válidos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar Dados Válidos": {
+      "main": [
+        [
+          {
+            "node": "Processar e Formatar Dados",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resposta de Erro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar e Formatar Dados": {
+      "main": [
+        [
+          {
+            "node": "Enviar Relatório por E-mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Relatório por E-mail": {
+      "main": [
+        [
+          {
+            "node": "Resposta de Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "300206d1-63c4-4ef2-81ca-98a8caf724a0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "75c2e7e46fe228b02b4e95b76f5694bd5920046ee8eacea4b7d2991600159ebb"
+  },
+  "id": "Q6ThywM9MhiJBIFw",
+  "tags": []
+}

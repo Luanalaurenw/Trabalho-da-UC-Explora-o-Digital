@@ -1,0 +1,354 @@
+{
+  "name": "Tarefa 5 — Análise de Sentimentos",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "analise-sentimentos",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node_webhook",
+      "name": "Webhook — Receber Texto",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "sentimentos-webhook-001",
+      "notes": "Recebe o texto via POST. Body esperado: { \"texto\": \"seu texto aqui\" }"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// NÓ DE CÓDIGO — Análise de Sentimentos por Palavras-Chave\n// Método escolhido: classificação léxica (sem API externa)\n// Vantagem: gratuito, sem latência de rede, sem dependência externa\n// Limitação: não capta ironia, contexto complexo ou linguagem informal\n// ============================================================\n\nconst texto = $input.first().json.body?.texto || $input.first().json.texto || '';\n\nif (!texto || texto.trim() === '') {\n  return [{\n    json: {\n      erro: 'Nenhum texto recebido.',\n      instrucao: 'Envie um POST com o campo \"texto\" no body JSON.'\n    }\n  }];\n}\n\nconst textoNormalizado = texto.toLowerCase()\n  .normalize('NFD')\n  .replace(/[\\u0300-\\u036f]/g, '')  // remove acentos\n  .replace(/[^a-z0-9\\s]/g, ' ');    // remove pontuação\n\nconst palavras = textoNormalizado.split(/\\s+/).filter(p => p.length > 1);\n\n// ---- Léxico de palavras positivas ----\nconst positivas = new Set([\n  'otimo', 'excelente', 'incrivel', 'fantastico', 'maravilhoso', 'perfeito',\n  'adorei', 'amei', 'gostei', 'gosto', 'feliz', 'felicidade', 'satisfeito',\n  'satisfacao', 'alegre', 'alegria', 'bom', 'boa', 'bons', 'boas', 'util',\n  'eficiente', 'rapido', 'facil', 'simples', 'recomendo', 'recomendaria',\n  'aprovei', 'aprovado', 'funciona', 'funcionou', 'resolveu', 'ajudou',\n  'ajuda', 'economizei', 'ganho', 'ganhos', 'lucro', 'crescimento',\n  'melhorou', 'melhor', 'top', 'show', 'parabens', 'obrigado', 'obrigada',\n  'sucesso', 'positivo', 'positiva', 'certo', 'certa', 'correto', 'grato',\n  'grata', 'agradecido', 'agradecida', 'encantado', 'encantada', 'surpreso',\n  'surpreendido', 'surpresa', 'impressionante', 'produtivo', 'produtividade'\n]);\n\n// ---- Léxico de palavras negativas ----\nconst negativas = new Set([\n  'pessimo', 'terrivel', 'horrivel', 'ruim', 'mal', 'mau', 'problema',\n  'problemas', 'erro', 'erros', 'falha', 'falhou', 'nao', 'nunca', 'jamais',\n  'odiei', 'odeio', 'detestei', 'detesto', 'insatisfeito', 'insatisfacao',\n  'frustrado', 'frustrada', 'frustrante', 'frustracao', 'triste', 'tristeza',\n  'decepcionado', 'decepcionante', 'decepcao', 'lento', 'lenta', 'dificil',\n  'complicado', 'travou', 'travando', 'bug', 'bugs', 'quebrado', 'quebrada',\n  'defeito', 'defeituoso', 'pior', 'pessima', 'horrores', 'catastrofico',\n  'caiu', 'caindo', 'perdido', 'perdi', 'cancelei', 'cancelamento', 'prejuizo',\n  'perda', 'perdas', 'negativo', 'negativa', 'errado', 'errada', 'incorreto',\n  'ineficiente', 'inutil', 'desapontado', 'desapontante', 'arrependido'\n]);\n\n// ---- Palavras de negação (invertem o próximo token) ----\nconst negacoes = new Set(['nao', 'nem', 'nunca', 'jamais', 'sem', 'nenhum', 'nenhuma']);\n\n// ---- Contagem ponderada ----\nlet scorePOS = 0;\nlet scoreNEG = 0;\nconst palavrasPositivasDetectadas = [];\nconst palavrasNegativasDetectadas = [];\n\nfor (let i = 0; i < palavras.length; i++) {\n  const palavra = palavras[i];\n  const negado = i > 0 && negacoes.has(palavras[i - 1]);\n\n  if (positivas.has(palavra)) {\n    if (negado) {\n      scoreNEG += 1;\n      palavrasNegativasDetectadas.push(`não_${palavra}`);\n    } else {\n      scorePOS += 1;\n      palavrasPositivasDetectadas.push(palavra);\n    }\n  } else if (negativas.has(palavra)) {\n    if (negado) {\n      scorePOS += 0.5; // negação de negativo = leve positivo\n      palavrasPositivasDetectadas.push(`não_${palavra}`);\n    } else {\n      scoreNEG += 1;\n      palavrasNegativasDetectadas.push(palavra);\n    }\n  }\n}\n\n// ---- Classificação final ----\nlet sentimento;\nlet confianca;\nconst diferenca = scorePOS - scoreNEG;\nconst totalTokens = scorePOS + scoreNEG;\n\nif (totalTokens === 0) {\n  sentimento = 'Neutro';\n  confianca = 'Baixa';\n} else if (diferenca > 0) {\n  sentimento = 'Positivo';\n  confianca = diferenca >= 2 ? 'Alta' : 'Media';\n} else if (diferenca < 0) {\n  sentimento = 'Negativo';\n  confianca = Math.abs(diferenca) >= 2 ? 'Alta' : 'Media';\n} else {\n  sentimento = 'Neutro';\n  confianca = 'Media';\n}\n\nconst resultado = {\n  sentimento,\n  confianca,\n  texto_original: texto,\n  scores: {\n    positivo: scorePOS,\n    negativo: scoreNEG,\n    balanco: diferenca\n  },\n  tokens_analisados: palavras.length,\n  palavras_positivas_detectadas: palavrasPositivasDetectadas,\n  palavras_negativas_detectadas: palavrasNegativasDetectadas,\n  metodo: 'classificacao_lexica_palavras_chave',\n  timestamp: new Date().toISOString()\n};\n\nreturn [{ json: resultado }];\n"
+      },
+      "id": "node_codigo",
+      "name": "Código — Classificar Sentimento",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 300],
+      "notes": "Análise léxica por palavras-chave com suporte a negação. Sem API externa."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond_positivo",
+              "leftValue": "={{ $json.sentimento }}",
+              "rightValue": "Positivo",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node_if_positivo",
+      "name": "É Positivo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond_negativo",
+              "leftValue": "={{ $json.sentimento }}",
+              "rightValue": "Negativo",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node_if_negativo",
+      "name": "É Negativo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [800, 520]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepara registro estruturado para sentimento POSITIVO\nconst d = $input.first().json;\nreturn [{\n  json: {\n    acao: 'REGISTRO_POSITIVO',\n    mensagem: `✅ Sentimento Positivo detectado com confiança ${d.confianca}.`,\n    texto: d.texto_original,\n    score_positivo: d.scores.positivo,\n    score_negativo: d.scores.negativo,\n    palavras_chave: d.palavras_positivas_detectadas,\n    timestamp: d.timestamp,\n    proximo_passo: 'Adicionar aba POSITIVOS na planilha / enviar e-mail de parabéns / registrar como elogio'\n  }\n}];\n"
+      },
+      "id": "node_trata_positivo",
+      "name": "Tratar Positivo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1060, 180],
+      "notes": "Cenário 1: texto com sentimento POSITIVO. Ex: 'O produto é excelente, adorei!'"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepara registro estruturado para sentimento NEGATIVO\nconst d = $input.first().json;\nreturn [{\n  json: {\n    acao: 'ALERTA_NEGATIVO',\n    mensagem: `🚨 Sentimento Negativo detectado com confiança ${d.confianca}. Requer atenção imediata.`,\n    texto: d.texto_original,\n    score_positivo: d.scores.positivo,\n    score_negativo: d.scores.negativo,\n    palavras_chave: d.palavras_negativas_detectadas,\n    timestamp: d.timestamp,\n    proximo_passo: 'Adicionar aba NEGATIVOS na planilha / disparar e-mail de suporte / abrir ticket'\n  }\n}];\n"
+      },
+      "id": "node_trata_negativo",
+      "name": "Tratar Negativo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1060, 520],
+      "notes": "Cenário 2: texto com sentimento NEGATIVO. Ex: 'Péssimo produto, travou tudo, horrível!'"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepara registro estruturado para sentimento NEUTRO\nconst d = $input.first().json;\nreturn [{\n  json: {\n    acao: 'REGISTRO_NEUTRO',\n    mensagem: `⚪ Sentimento Neutro detectado. Texto sem carga emocional evidente.`,\n    texto: d.texto_original,\n    score_positivo: d.scores.positivo,\n    score_negativo: d.scores.negativo,\n    tokens_analisados: d.tokens_analisados,\n    timestamp: d.timestamp,\n    proximo_passo: 'Adicionar aba NEUTROS na planilha / revisar manualmente se necessário'\n  }\n}];\n"
+      },
+      "id": "node_trata_neutro",
+      "name": "Tratar Neutro",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1060, 680],
+      "notes": "Cenário 3: texto sem carga emocional clara."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Monta resposta HTTP final unificada\nconst entrada = $input.first().json;\n\nconst emojis = {\n  'REGISTRO_POSITIVO': '✅',\n  'ALERTA_NEGATIVO': '🚨',\n  'REGISTRO_NEUTRO': '⚪'\n};\n\nreturn [{\n  json: {\n    status: 'ok',\n    resultado: `Sentimento: ${entrada.acao?.includes('POSITIVO') ? 'Positivo' : entrada.acao?.includes('NEGATIVO') ? 'Negativo' : 'Neutro'}`,\n    icone: emojis[entrada.acao] || '❓',\n    mensagem: entrada.mensagem,\n    acao_sugerida: entrada.proximo_passo,\n    detalhes: {\n      texto_analisado: entrada.texto,\n      score_positivo: entrada.score_positivo,\n      score_negativo: entrada.score_negativo,\n      palavras_chave: entrada.palavras_chave || [],\n      timestamp: entrada.timestamp\n    },\n    metodo: 'Classificação Léxica por Palavras-Chave (sem API externa)',\n    limitacoes: [\n      'Não detecta ironia ou sarcasmo',\n      'Linguagem informal ou gírias podem não ser reconhecidas',\n      'Contextos ambíguos podem resultar em classificação Neutra',\n      'Léxico limitado ao vocabulário cadastrado'\n    ]\n  }\n}];\n"
+      },
+      "id": "node_preparar_resposta",
+      "name": "Preparar Resposta Final",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 420]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node_resposta_webhook",
+      "name": "Responder Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1560, 420],
+      "notes": "Retorna o resultado classificado ao chamador do webhook."
+    }
+  ],
+  "connections": {
+    "Webhook — Receber Texto": {
+      "main": [
+        [
+          {
+            "node": "Código — Classificar Sentimento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Código — Classificar Sentimento": {
+      "main": [
+        [
+          {
+            "node": "É Positivo?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "É Negativo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "É Positivo?": {
+      "main": [
+        [
+          {
+            "node": "Tratar Positivo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "É Negativo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "É Negativo?": {
+      "main": [
+        [
+          {
+            "node": "Tratar Negativo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tratar Neutro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tratar Positivo": {
+      "main": [
+        [
+          {
+            "node": "Preparar Resposta Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tratar Negativo": {
+      "main": [
+        [
+          {
+            "node": "Preparar Resposta Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tratar Neutro": {
+      "main": [
+        [
+          {
+            "node": "Preparar Resposta Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Resposta Final": {
+      "main": [
+        [
+          {
+            "node": "Responder Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "Webhook — Receber Texto": [
+      {
+        "json": {
+          "_CENARIO_1_POSITIVO": {
+            "descricao": "Texto com sentimento claramente positivo",
+            "body": {
+              "texto": "O produto é excelente, adorei tudo! Funcionou perfeitamente e recomendo para todos. Muito satisfeito com a compra."
+            }
+          },
+          "_CENARIO_2_NEGATIVO": {
+            "descricao": "Texto com sentimento claramente negativo",
+            "body": {
+              "texto": "Péssima experiência! O sistema travou, cheio de erros e bugs. Estou muito frustrado e decepcionado com o atendimento horrível."
+            }
+          },
+          "_CENARIO_3_NEUTRO": {
+            "descricao": "Texto informativo sem carga emocional",
+            "body": {
+              "texto": "O pedido foi realizado na segunda-feira e o prazo de entrega é de cinco dias úteis."
+            }
+          },
+          "_CENARIO_4_NEGACAO": {
+            "descricao": "Texto com negação invertendo sentimento",
+            "body": {
+              "texto": "Não é ruim, mas também não é excelente. Funciona, mas não recomendaria sem ressalvas."
+            }
+          }
+        }
+      }
+    ]
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2026-06-12T00:00:00.000Z",
+      "updatedAt": "2026-06-12T00:00:00.000Z",
+      "id": "tag-tarefa5",
+      "name": "tarefa5-sentimentos"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2026-06-12T00:00:00.000Z",
+  "versionId": "v1.0.0",
+  "_documentacao": {
+    "titulo": "Tarefa 5 — Análise de Sentimentos no N8N",
+    "descricao": "Fluxo completo de análise de sentimentos via webhook com classificação léxica por palavras-chave.",
+    "metodo_escolhido": "Classificação Léxica por Palavras-Chave (nó de código, sem API externa)",
+    "justificativa_metodo": "Método gratuito, sem dependência de API, com resposta instantânea. Ideal para demonstração e ambientes sem créditos em APIs externas.",
+    "como_usar": {
+      "passo1": "Importe este JSON no N8N via menu Import > From File",
+      "passo2": "Ative o workflow clicando em 'Active'",
+      "passo3": "Copie a URL do webhook exibida no nó 'Webhook — Receber Texto'",
+      "passo4": "Envie um POST para a URL com body: { \"texto\": \"seu texto aqui\" }",
+      "exemplo_curl_positivo": "curl -X POST <WEBHOOK_URL> -H 'Content-Type: application/json' -d '{\"texto\": \"Produto excelente, adorei! Muito satisfeito.\"}'",
+      "exemplo_curl_negativo": "curl -X POST <WEBHOOK_URL> -H 'Content-Type: application/json' -d '{\"texto\": \"Péssimo! Travou tudo, erro atrás de erro, horrível.\"}'"
+    },
+    "cenarios_demonstrados": [
+      {
+        "cenario": "Texto Positivo",
+        "exemplo": "O produto é excelente, adorei tudo! Funcionou perfeitamente.",
+        "resultado_esperado": "Sentimento: Positivo | Ação: REGISTRO_POSITIVO"
+      },
+      {
+        "cenario": "Texto Negativo",
+        "exemplo": "Péssima experiência! Sistema travou, cheio de erros e bugs.",
+        "resultado_esperado": "Sentimento: Negativo | Ação: ALERTA_NEGATIVO"
+      },
+      {
+        "cenario": "Texto Neutro",
+        "exemplo": "O pedido foi realizado na segunda-feira.",
+        "resultado_esperado": "Sentimento: Neutro | Ação: REGISTRO_NEUTRO"
+      },
+      {
+        "cenario": "Negação",
+        "exemplo": "Não é ruim, mas também não é excelente.",
+        "resultado_esperado": "Sentimento: Neutro ou Positivo fraco (negação tratada)"
+      }
+    ],
+    "limitacoes": [
+      "Não detecta ironia ou sarcasmo",
+      "Léxico limitado ao vocabulário cadastrado (expansível)",
+      "Contextos complexos podem gerar resultado Neutro incorreto",
+      "Gírias e linguagem muito informal podem não ser reconhecidas"
+    ],
+    "como_expandir": [
+      "Substituir o nó de código por chamada à HuggingFace Inference API (modelo: lxyuan/distilbert-base-multilingual-cased-sentiments-student)",
+      "Usar OpenAI API com prompt: 'Classifique o sentimento como Positivo, Negativo ou Neutro: {texto}'",
+      "Conectar a uma planilha Google Sheets: aba POSITIVOS, NEGATIVOS, NEUTROS",
+      "Adicionar nó de e-mail (Gmail/SMTP) para alertas de sentimento negativo"
+    ]
+  }
+}

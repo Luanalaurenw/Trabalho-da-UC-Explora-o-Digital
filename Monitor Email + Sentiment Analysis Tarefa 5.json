@@ -1,0 +1,383 @@
+{
+  "name": "Monitor Email + Sentiment Analysis Tarefa 5",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "monitor-email",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "c7998c0e-a242-4d6d-93b7-cb47dd359239",
+      "name": "Recebe Palavra",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -464,
+        1056
+      ],
+      "webhookId": "c61dd61f-4327-4845-a793-e75b6bd596f4"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-1",
+              "leftValue": "={{ $json.query.palavra }}",
+              "rightValue": "urgente",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9877b669-e349-4d93-89cd-57cfa9c0796d",
+      "name": "É urgente?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -64,
+        976
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "wanzilerdavi@gmail.com",
+        "toEmail": "xandaodoespadao@gmail.com",
+        "subject": "=⚠️ URGENTE: {{ $json.query.palavra }}",
+        "emailFormat": "text",
+        "text": "=Alerta URGENTE recebido em {{ $now.toFormat('yyyy-MM-dd HH:mm:ss') }}.\n\nPalavra recebida: {{ $json.query.palavra }}\n\nTexto completo: {{ $json.query.texto }}",
+        "options": {}
+      },
+      "id": "a1e500e2-35e8-44bb-8341-36480ab561f9",
+      "name": "Email urgente",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        848
+      ],
+      "webhookId": "12338a7c-8457-4ac6-8957-514e4464c476",
+      "credentials": {
+        "smtp": {
+          "id": "AkwYT6PxOhP8IXWc",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "wanzilerdavi@gmail.com",
+        "toEmail": "xandaodoespadao@gmail.com",
+        "subject": "=✅ NORMAL: {{ $json.query.palavra }}",
+        "emailFormat": "text",
+        "text": "=Mensagem NORMAL recebida em {{ $now.toFormat('yyyy-MM-dd HH:mm:ss') }}.\n\nPalavra recebida: {{ $json.query.palavra }}\n\nTexto completo: {{ $json.query.texto }}",
+        "options": {}
+      },
+      "id": "897e25f8-e15f-46d9-bc36-4df27a81b24c",
+      "name": "Email normal",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        1040
+      ],
+      "webhookId": "ca6442fc-70b6-4ad7-ac22-d008d190562c",
+      "credentials": {
+        "smtp": {
+          "id": "AkwYT6PxOhP8IXWc",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"ok\", \"tipo\": \"urgente\", \"palavra\": \"{{ $json.query.palavra }}\", \"timestamp\": \"{{ $now.toISO() }}\" }",
+        "options": {}
+      },
+      "id": "8ac9d522-fa64-4104-929e-b500a16883c3",
+      "name": "Responde urgente",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        464,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"ok\", \"tipo\": \"normal\", \"palavra\": \"{{ $json.query.palavra }}\", \"timestamp\": \"{{ $now.toISO() }}\" }",
+        "options": {}
+      },
+      "id": "5898e447-fbdf-40bb-878b-27ae0e15e287",
+      "name": "Responde normal",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        464,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "wanzilerdavi@gmail.com",
+        "toEmail": "xandaodoespadao@gmail.com",
+        "subject": "=😊 SENTIMENTO POSITIVO detectado — {{ $now.toFormat('dd/MM/yyyy HH:mm') }}",
+        "emailFormat": "text",
+        "text": "=✅ Análise de Sentimento: POSITIVO\n\nTexto analisado:\n{{ $('Recebe Palavra').item.json.query.texto }}\n\n---\nResultado detalhado do modelo:\nSentimento: {{ $json.category }}\nScore: {{ $json.score }}\n\nRecebido em: {{ $now.toFormat('yyyy-MM-dd HH:mm:ss') }}",
+        "options": {}
+      },
+      "id": "51e28626-1333-40a9-8d4a-4c83fa0c5d9f",
+      "name": "Gmail positivo",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        1280
+      ],
+      "webhookId": "d6187f48-2cee-4b89-9547-5f38d00d9ae5",
+      "credentials": {
+        "smtp": {
+          "id": "AkwYT6PxOhP8IXWc",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "wanzilerdavi@gmail.com",
+        "toEmail": "xandaodoespadao@gmail.com",
+        "subject": "=😠 SENTIMENTO NEGATIVO detectado — {{ $now.toFormat('dd/MM/yyyy HH:mm') }}",
+        "emailFormat": "text",
+        "text": "=⚠️ Análise de Sentimento: NEGATIVO\n\nTexto analisado:\n{{ $('Recebe Palavra').item.json.query.texto }}\n\n---\nResultado detalhado do modelo:\nSentimento: {{ $json.category }}\nScore: {{ $json.score }}\n\nRecebido em: {{ $now.toFormat('yyyy-MM-dd HH:mm:ss') }}",
+        "options": {}
+      },
+      "id": "2f7fb7f7-4672-49cc-9ade-d5a7e82df1bf",
+      "name": "Gmail negativo",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        1456
+      ],
+      "webhookId": "b05d86f8-46f7-4d3f-9972-30b13b16742e",
+      "credentials": {
+        "smtp": {
+          "id": "AkwYT6PxOhP8IXWc",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"ok\", \"sentimento\": \"positivo\", \"texto\": \"{{ $('Recebe Palavra').item.json.query.texto }}\", \"timestamp\": \"{{ $now.toISO() }}\" }",
+        "options": {}
+      },
+      "id": "c9acb30a-23ec-4755-8c60-358a7ff775e3",
+      "name": "Resposta positiva",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        464,
+        1280
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"ok\", \"sentimento\": \"negativo\", \"texto\": \"{{ $('Recebe Palavra').item.json.query.texto }}\", \"timestamp\": \"{{ $now.toISO() }}\" }",
+        "options": {}
+      },
+      "id": "ac3b7aee-8950-4a71-ac7a-a82aee996f01",
+      "name": "Resposta negativa",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        464,
+        1456
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const texto = ($json.query.texto || \"\").toLowerCase();\n\nlet sentiment = \"Neutral\";\n\nif (\n  texto.includes(\"gostei\") ||\n  texto.includes(\"adorei\") ||\n  texto.includes(\"ótimo\") ||\n  texto.includes(\"excelente\") ||\n  texto.includes(\"bom\")\n) {\n  sentiment = \"Positive\";\n}\n\nif (\n  texto.includes(\"odiei\") ||\n  texto.includes(\"horrível\") ||\n  texto.includes(\"péssimo\") ||\n  texto.includes(\"ruim\")\n) {\n  sentiment = \"Negative\";\n}\n\nreturn [{\n  json: {\n    ...$json,\n    sentiment\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        1248
+      ],
+      "id": "68344861-788b-48e6-b114-002afff845f3",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "380044ab-1c40-4f7e-99a9-10b13a1f6268",
+              "leftValue": "={{$json.sentiment}}",
+              "rightValue": "Positive",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -16,
+        1280
+      ],
+      "id": "aa198fc6-693b-4a43-abb0-983a9bb26d03",
+      "name": "If"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Recebe Palavra": {
+      "main": [
+        [
+          {
+            "node": "É urgente?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "É urgente?": {
+      "main": [
+        [
+          {
+            "node": "Email urgente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email normal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email urgente": {
+      "main": [
+        [
+          {
+            "node": "Responde urgente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email normal": {
+      "main": [
+        [
+          {
+            "node": "Responde normal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail positivo": {
+      "main": [
+        [
+          {
+            "node": "Resposta positiva",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail negativo": {
+      "main": [
+        [
+          {
+            "node": "Resposta negativa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Gmail positivo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gmail negativo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "3e41aa46-3844-488d-8722-c740dab3c914",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "75c2e7e46fe228b02b4e95b76f5694bd5920046ee8eacea4b7d2991600159ebb"
+  },
+  "id": "mxh6yzEohI5KX9OS",
+  "tags": []
+}
